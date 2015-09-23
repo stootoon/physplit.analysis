@@ -101,6 +101,8 @@ ClusterLhnData <- function(Data, numClusters=3, kalpha=10, thalpha=3/20, sdv0 = 
        l0     = matrix(sapply(Data$Fits, FUN=function(x) x$l0), nrow=N, ncol=1);
        v0     = matrix(sapply(Data$Fits, FUN=function(x) x$v0), nrow=N, ncol=1);
        al     = matrix(sapply(Data$Fits, FUN=function(x) x$al), nrow=N, ncol=1);
+       if (is.null(ainit) || any(sapply(l0, FUN=is.null)) || any(sapply(v0, FUN=is.null)) || any(sapply(al, FUN=is.null)))
+           stop("Either ainit, l0, v0 or al is NULL. Did you supply the fits correctly?")
    }
   F      = matrix(NaN, nrow=numIters, ncol=1);
 
@@ -217,7 +219,7 @@ ClusterLhnData <- function(Data, numClusters=3, kalpha=10, thalpha=3/20, sdv0 = 
 
     ## Force the cluster centers to have fixed gain, to reduce degeneracy.
     if (!is.null(iclust))
-        gradAl[,,iclust,] = 0;
+        gradAl[iclust] = 0;
         
     grada = apply(ZqVa*U1, c(2,4),FUN="sum");
     G     = ComputeGtsnk(X,a);
