@@ -104,7 +104,7 @@ ClusterLhnData <- function(Data, numClusters=3, kalpha=10, thalpha=3/20, sdv0 = 
        if (is.null(ainit) || any(sapply(l0, FUN=is.null)) || any(sapply(v0, FUN=is.null)) || any(sapply(al, FUN=is.null)))
            stop("Either ainit, l0, v0 or al is NULL. Did you supply the fits correctly?")
    }
-  F      = matrix(NaN, nrow=numIters, ncol=1);
+  F = matrix(NaN, nrow=numIters, ncol=1);
 
   ## Initialize the clusters
   a = array(0,c(2,S,K));
