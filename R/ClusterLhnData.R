@@ -62,7 +62,7 @@
 #'   hit the maximum number of iterations, "SLOPE_RATIO" if it exited early due
 #'   to the slope ratio.}
 #' @export
-ClusterLhnData <- function(Data, numClusters=3, kalpha=10, thalpha=3/20, tauv0 = 0.1, taua=1, taul0=0.5, minIters = 0, numIters=10000, dt=1e-5, seed=0, initMode="random", verbose=TRUE, timer="OFF", slopeRatioToStop=100, numSlopePoints=20, checkToStopEvery=100, keepHistory = NULL){
+ClusterLhnData <- function(Data, numClusters=3, kalpha=10, thalpha=3/20, sdv0 = 0.1, taua=1, taul0=0.5, minIters = 0, numIters=10000, dt=1e-5, seed=0, initMode="random", verbose=TRUE, timer="OFF", slopeRatioToStop=100, numSlopePoints=20, checkToStopEvery=100, keepHistory = NULL){
   set.seed(seed);
   Timers = TIMER_INIT(status=timer);
 
@@ -106,6 +106,7 @@ ClusterLhnData <- function(Data, numClusters=3, kalpha=10, thalpha=3/20, tauv0 =
 
   ## Initialize the clusters
   a = array(0,c(2,S,K));
+  iclust = NULL;
   if (initMode=="single"){
       if (K != 1)
           stop("Number of clusters must equal 1 when fitting a single data point.");
@@ -114,8 +115,8 @@ ClusterLhnData <- function(Data, numClusters=3, kalpha=10, thalpha=3/20, tauv0 =
   }else if (initMode=="random"){
     a = array(runif(n = 2*K*S), dim=c(2,S,K));
   }else if (initMode=="kmeans"){
-    isample = sample(N,size=S,replace=FALSE);
-    a      = ainit[,,isample];
+    iclust = sample(N,size=S,replace=FALSE);
+    a      = ainit[,,iclust];
   }else if (initMode =="kmeans++"){
     ## Pick the first cluster center at random from the data
     iclust = sample(N,1);
@@ -169,10 +170,11 @@ ClusterLhnData <- function(Data, numClusters=3, kalpha=10, thalpha=3/20, tauv0 =
     qtsnk = aperm(array(rep(qnk,S*T),dim=c(N,K,T,S)), c(3,4,1,2));
     ## Compute the objective function
     H = -qnk*log(qnk); H = sum(H[!is.nan(H)]); # Entropy
-    Eqll = sum(qtsnk * LL); # Expected log likelihood
+    Eqll  = sum(qtsnk * LL); # Expected log likelihood
     lprAl = sum((kalpha-1)*log(al) - al/thalpha); ## Prior on alpha
+    lprV0 = -sum(v0^2)/2/sdv0/sdv0;
 
-    F[[t]] = H + Eqll + lprAl;
+    F[[t]] = H + Eqll + lprAl + lprV0;
     Timers <- TIMER_TOC("E_STEP", Timers);
 
     args = c(list(history, !is.null(keepHistory), t, numIters), keepHistory);
@@ -211,8 +213,12 @@ ClusterLhnData <- function(Data, numClusters=3, kalpha=10, thalpha=3/20, tauv0 =
 
     gradL0 =  apply(Zq,     3, FUN="sum");
     gradAl =  apply(ZqV*V,  3, FUN="sum") + ((kalpha - 1)/al - 1/thalpha); ## Add a prior on Al
-    gradV0 = -apply(ZqV,    3, FUN="sum")*al;
+    gradV0 = -apply(ZqV,    3, FUN="sum")*al - v0/sdv0/sdv0; ## Add a prior on the thresholds
 
+    ## Force the cluster centers to have fixed gain, to reduce degeneracy.
+    if (!is.null(iclust))
+        gradAl[,,iclust,] = 0;
+        
     grada = apply(ZqVa*U1, c(2,4),FUN="sum");
     G     = ComputeGtsnk(X,a);
     gradr = apply(ZqVa*G, c(2,4),FUN="sum");
